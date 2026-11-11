@@ -1,6 +1,6 @@
 // Dibuja el cuarto, al humano dormido y a los mosquitos en un canvas de 1280×720.
 // Estilo low-poly plano, de noche, como el clip 3D de Oliver.
-import { W, H, OREJA, LAMPARA, VENTANA, iluminado } from './sim.js';
+import { W, H, OREJA, LAMPARA, VENTANA, HAMACA, ESPIRAL, iluminado, puntoHamaca, humoX } from './sim.js';
 
 const C = {
   noche: '#141522', pared: '#1f1d2b', pared2: '#262335', piso: '#2b2018', madera: '#4a2c17',
@@ -22,6 +22,105 @@ function circulo(ctx, x, y, r, color) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
+}
+
+export function escena(ctx, est, t) {
+  if (est.escenario === 'patio') patio(ctx, est, t);
+  else cuarto(ctx, est, t);
+}
+
+// LA FINAL: patio de noche, el humano en una hamaca que se mece, la espiral humeando y viento
+function patio(ctx, est, t) {
+  // cielo y estrellas
+  const cielo = ctx.createLinearGradient(0, 0, 0, 620);
+  cielo.addColorStop(0, '#0a0f2c'); cielo.addColorStop(1, '#1d2347');
+  ctx.fillStyle = cielo; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) {
+    const x = (i * 337) % W, y = (i * 151) % 330, b = 0.4 + 0.4 * Math.sin(t * 2 + i);
+    circulo(ctx, x, y, 1.4, `rgba(220,230,255,${b})`);
+  }
+  circulo(ctx, 360, 90, 34, C.luna);
+  circulo(ctx, 348, 82, 32, '#0f1533');
+  // medianera con ligustrina (de acá salen los mosquitos)
+  poly(ctx, [0, 380, W, 400, W, 620, 0, 620], '#2a2638');
+  for (let x = 0; x < W; x += 80) poly(ctx, [x, 382 + x / 64, x + 78, 383 + x / 64, x + 78, 620, x, 620], x % 160 ? '#2f2a40' : '#2a2638');
+  for (const [x, y, r] of [[110, 300, 90], [210, 270, 80], [60, 220, 70], [250, 350, 70], [150, 380, 80]]) circulo(ctx, x, y, r, '#1c3326');
+  for (const [x, y, r] of [[130, 260, 50], [200, 320, 45], [80, 330, 40]]) circulo(ctx, x, y, r, '#244233');
+  // baldosas del patio
+  ctx.fillStyle = '#3a2f2a'; ctx.fillRect(0, 620, W, 100);
+  ctx.strokeStyle = '#2c2420'; ctx.lineWidth = 2;
+  for (let x = 0; x < W; x += 64) { ctx.beginPath(); ctx.moveTo(x, 620); ctx.lineTo(x - 30, 720); ctx.stroke(); }
+  // el árbol con la rama de la hamaca
+  poly(ctx, [1150, 720, 1210, 720, 1195, 40, 1165, 40], '#3d2a1c');
+  poly(ctx, [1180, 60, 1180, 84, HAMACA.x - 120, 82, HAMACA.x - 120, 64], '#3d2a1c');
+  for (const [x, y, r] of [[1180, 30, 110], [1040, 20, 90], [900, 10, 80], [1260, 90, 90], [780, 25, 60]]) circulo(ctx, x, y, r, '#17291f');
+  for (const [x, y, r] of [[1120, 40, 60], [980, 30, 50], [1240, 50, 50]]) circulo(ctx, x, y, r, '#1f3829');
+
+  // hamaca: cuelga de la rama con dos sogas y se mece
+  const ang = est.hamaca || 0;
+  const c = puntoHamaca(ang);
+  const rot = (lx, ly) => ({ x: c.x + lx * Math.cos(ang) - ly * Math.sin(ang), y: c.y + lx * Math.sin(ang) + ly * Math.cos(ang) });
+  const izq = rot(-170, -30), der = rot(170, -30);
+  ctx.strokeStyle = '#b9a27a'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(HAMACA.x - 30, HAMACA.y + 12); ctx.lineTo(izq.x, izq.y);
+  ctx.moveTo(HAMACA.x + 30, HAMACA.y + 12); ctx.lineTo(der.x, der.y); ctx.stroke();
+  ctx.save();
+  ctx.translate(c.x, c.y); ctx.rotate(ang);
+  const resp = Math.sin(t * 1.6) * 3;
+  // cuerpo acostado (de costado, piernas a la izquierda)
+  poly(ctx, [-150, -22, -60, -40 - resp, 40, -46 - resp, 100, -40, 100, -10, -150, -6], '#6c5a8a');
+  poly(ctx, [-150, -12, 100, -18, 100, -6, -150, -2], '#584a73');
+  circulo(ctx, 120, -36, 32, C.piel);                                         // cabeza
+  poly(ctx, [96, -60, 130, -70, 152, -52, 146, -40, 120, -54, 100, -46], C.pelo);
+  ctx.strokeStyle = '#5a3a26'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(128, -34, 6, 0.2, Math.PI - 0.2); ctx.stroke();  // ojo cerrado
+  // tela de la hamaca, a rayas
+  ctx.beginPath(); ctx.moveTo(-170, -30); ctx.quadraticCurveTo(0, 60, 170, -30); ctx.quadraticCurveTo(0, 20, -170, -30);
+  ctx.fillStyle = '#c0533e'; ctx.fill();
+  ctx.strokeStyle = '#e8c35a'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(-150, -18); ctx.quadraticCurveTo(0, 50, 150, -18); ctx.stroke();
+  ctx.restore();
+  circulo(ctx, est.oreja.x, est.oreja.y, 10, C.piel2);                          // oreja
+  if (est.molestia < 70) {
+    ctx.fillStyle = 'rgba(220,225,255,0.7)';
+    ctx.font = 'bold 20px "Arial Black", Arial';
+    const z = (t * 0.7) % 1;
+    ctx.fillText('z', est.oreja.x + 20 + z * 30, est.oreja.y - 60 - z * 50);
+  }
+
+  // la espiral en su platito, con la brasa
+  ctx.fillStyle = '#6d6a63';
+  ctx.beginPath(); ctx.ellipse(ESPIRAL.x, ESPIRAL.y + 14, 44, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#3f6b3a'; ctx.lineWidth = 5;
+  ctx.beginPath();
+  for (let a = 0; a < Math.PI * 6; a += 0.2) {
+    const r = 4 + a * 1.7;
+    const x = ESPIRAL.x + Math.cos(a) * r, y = ESPIRAL.y + 8 + Math.sin(a) * r * 0.28;
+    a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  circulo(ctx, ESPIRAL.x + 34, ESPIRAL.y + 8, 4 + Math.sin(t * 7), '#ff7a3a');
+  // el humo (la zona que te saca puntos)
+  const r = est.reloj || t;
+  for (let y = ESPIRAL.y; y > ESPIRAL.y - 420; y -= 14) {
+    const ancho = 30 + 40 * (ESPIRAL.y - y) / 420;
+    const k = (ESPIRAL.y - y) / 420;
+    ctx.fillStyle = `rgba(200,210,215,${0.2 - k * 0.12})`;
+    ctx.beginPath(); ctx.ellipse(humoX(y, r) + Math.sin(t * 2 + y) * 6, y, ancho, 12, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // viento: hojas y rayas que cruzan
+  const V = est.viento || { estado: 'calma', dir: 1 };
+  if (V.estado !== 'calma') {
+    const fuerza = V.estado === 'sopla' ? 1 : 0.35;
+    ctx.strokeStyle = `rgba(210,225,255,${0.35 * fuerza})`; ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) {
+      const y = 60 + (i * 97) % 520;
+      const x = ((i * 211 + t * 900 * V.dir) % (W + 200) + W + 200) % (W + 200) - 100;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - V.dir * 90 * fuerza, y + 4); ctx.stroke();
+      if (i % 3 === 0) poly(ctx, [x, y + 10, x + 10, y + 4, x + 14, y + 14, x + 4, y + 18], '#3f6b3a');
+    }
+  }
 }
 
 export function cuarto(ctx, est, t) {
@@ -79,7 +178,14 @@ export function cuarto(ctx, est, t) {
 
 export function luz(ctx, est, t) {
   const L = est.lampara.estado;
-  if (L === 'prendida') {
+  const oreja = est.oreja || OREJA;
+  if (est.escenario === 'patio') {
+    ctx.fillStyle = 'rgba(5,6,18,0.3)';
+    ctx.fillRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(ESPIRAL.x + 34, ESPIRAL.y + 8, 4, ESPIRAL.x + 34, ESPIRAL.y + 8, 90);
+    g.addColorStop(0, 'rgba(255,120,60,0.25)'); g.addColorStop(1, 'rgba(255,120,60,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  } else if (L === 'prendida') {
     const g = ctx.createRadialGradient(LAMPARA.x, LAMPARA.y, 20, LAMPARA.x, LAMPARA.y, LAMPARA.radio);
     g.addColorStop(0, 'rgba(255,200,120,0.55)');
     g.addColorStop(1, 'rgba(255,190,110,0)');
@@ -103,12 +209,12 @@ export function luz(ctx, est, t) {
   ctx.strokeStyle = 'rgba(255,220,150,0.18)';
   ctx.setLineDash([6, 10]);
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(OREJA.x, OREJA.y, 150, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(oreja.x, oreja.y, 150, 0, Math.PI * 2); ctx.stroke();
   ctx.setLineDash([]);
 }
 
 export function mosquito(ctx, p, t, propio) {
-  if (p.muerto > 0) return;
+  if (p.muerto > 0 || p.fuera) return;
   const mira = p.vx < -10 ? -1 : 1;
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -216,19 +322,33 @@ export function globos(ctx, lista, jugadores, t) {
   }
 }
 
-export function hud(ctx, est, miId) {
-  // reloj
+function texto(ctx, s, x, y, tam, color) {
   ctx.textAlign = 'center';
-  ctx.font = '900 34px "Arial Black", Arial';
-  ctx.fillStyle = est.tiempo < 10 ? '#ff6b5a' : '#fff';
-  ctx.fillText(Math.ceil(est.tiempo), W / 2, 46);
+  ctx.font = `900 ${tam}px "Arial Black", Arial`;
+  ctx.fillStyle = color;
+  ctx.fillText(s, x, y);
   ctx.textAlign = 'left';
-  // puntajes
-  const orden = [...est.jugadores].sort((a, b) => b.pts - a.pts);
+}
+
+export function hud(ctx, est, miId) {
+  const final = est.escenario === 'patio';
+  const meta = est.meta || 250;
+  // ronda y reloj
+  texto(ctx, final ? 'LA FINAL' : `RONDA ${est.ronda || 1}`, W / 2, 30, 18, final ? '#ffb35a' : '#cfc8e0');
+  texto(ctx, Math.ceil(est.tiempo), W / 2, 66, 30, est.tiempo < 10 ? '#ff6b5a' : '#fff');
+  // carrera a la meta: solo los que siguen en juego
+  const orden = est.jugadores.filter(p => !p.fuera).sort((a, b) => b.pts - a.pts);
+  ctx.font = 'bold 13px "Arial Black", Arial';
+  ctx.fillStyle = '#cfc8e0';
+  ctx.fillText(`PRIMERO A ${meta}`, 20, 22);
   orden.forEach((p, i) => {
-    ctx.font = `${p.id === miId ? '900 ' : 'bold '}18px "Arial Black", Arial`;
+    const y = 32 + i * 30;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(20, y + 14, 200, 6);
     ctx.fillStyle = p.color;
-    ctx.fillText(`${i + 1}. ${p.nombre}  ${p.pts}`, 20, 34 + i * 26);
+    ctx.fillRect(20, y + 14, 200 * Math.min(1, p.pts / meta), 6);
+    ctx.font = `${p.id === miId ? '900 ' : 'bold '}16px "Arial Black", Arial`;
+    ctx.fillText(`${p.nombre}  ${p.pts}`, 20, y + 10);
   });
   // ¿se despierta?
   const x = W - 280, y = 22;
@@ -239,26 +359,12 @@ export function hud(ctx, est, miId) {
   ctx.fillRect(x, y + 10, 250, 14);
   ctx.fillStyle = est.molestia > 75 ? '#ff6b5a' : '#ffb35a';
   ctx.fillRect(x, y + 10, 2.5 * est.molestia, 14);
-  // aviso del velador
-  if (est.lampara.estado === 'aviso') {
-    ctx.textAlign = 'center';
-    ctx.font = '900 30px "Arial Black", Arial';
-    ctx.fillStyle = '#ffe2a8';
-    ctx.fillText('mmmh… ¿quién anda ahí?', W / 2, 110);
-    ctx.textAlign = 'left';
-  }
+  // avisos del escenario
+  if (est.lampara.estado === 'aviso') texto(ctx, 'mmmh… ¿quién anda ahí?', W / 2, 116, 30, '#ffe2a8');
+  if (final && est.viento && est.viento.estado === 'aviso') texto(ctx, est.viento.dir > 0 ? 'Se levanta viento  →' : '←  Se levanta viento', W / 2, 116, 30, '#d2e1ff');
   const yo = est.jugadores.find(p => p.id === miId);
-  if (yo && yo.muerto > 0) {
-    ctx.textAlign = 'center';
-    ctx.font = '900 28px "Arial Black", Arial';
-    ctx.fillStyle = '#ff6b5a';
-    ctx.fillText(`Aplastado. Volvés por la ventana en ${yo.muerto.toFixed(1)}`, W / 2, H - 40);
-    ctx.textAlign = 'left';
-  } else if (yo && est.lampara.estado === 'prendida' && iluminado(yo)) {
-    ctx.textAlign = 'center';
-    ctx.font = '900 26px "Arial Black", Arial';
-    ctx.fillStyle = '#ffe2a8';
-    ctx.fillText('¡Te ve! Escondete en la oscuridad', W / 2, H - 40);
-    ctx.textAlign = 'left';
-  }
+  if (yo && yo.fuera) texto(ctx, 'Quedaste afuera. Mirá cómo sigue.', W / 2, H - 40, 26, '#cfc8e0');
+  else if (yo && yo.muerto > 0) texto(ctx, `Aplastado. Volvés en ${yo.muerto.toFixed(1)}`, W / 2, H - 40, 28, '#ff6b5a');
+  else if (yo && yo.humo) texto(ctx, '¡Humo de espiral! Salí de ahí', W / 2, H - 40, 26, '#d8e0e4');
+  else if (yo && !final && est.lampara.estado === 'prendida' && iluminado(yo)) texto(ctx, '¡Te ve! Escondete en la oscuridad', W / 2, H - 40, 26, '#ffe2a8');
 }

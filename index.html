@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>No pica, zumba</title>
+<link rel="icon" href="data:,">
 <style>
   :root { --fondo: #0e0d16; --tinta: #f3eee6; --tenue: #a29db3; --acento: #ffb35a; --peligro: #ff6b5a; --panel: #1b1926; }
   * { box-sizing: border-box; }
@@ -37,6 +38,21 @@
   kbd { background: #2c2840; border-radius: 5px; padding: 1px 7px; color: var(--tinta); font-family: inherit; }
   .error { color: var(--peligro); min-height: 1.2em; font-size: 14px; margin: 10px 0 0; }
   #mute { position: absolute; right: 10px; bottom: 10px; padding: 6px 10px; font-size: 13px; opacity: 0.7; }
+  #salirJuego { position: absolute; left: 10px; bottom: 10px; padding: 6px 10px; font-size: 13px; opacity: 0.7; }
+  #salirJuego[hidden] { display: none; }
+  button.enlace { background: none; padding: 6px 0; color: var(--tenue); font-weight: normal; text-decoration: underline; }
+  button.enlace:hover { background: none; color: var(--tinta); }
+  .reglas { font-size: 13px; color: var(--tenue); margin: 8px 0 0; }
+  .perfil { margin-top: 16px; padding-top: 12px; border-top: 1px solid #2a2638; font-size: 13px; color: var(--tenue); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .perfil b { color: var(--tinta); }
+  .tarjeta.ancha { width: min(560px, 94%); max-height: 92%; overflow: auto; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0 14px; }
+  .stats div { background: #12111b; border-radius: 10px; padding: 10px; text-align: center; }
+  .stats b { display: block; font-family: "Arial Black", Arial; font-size: 24px; color: var(--acento); }
+  .stats span { font-size: 12px; color: var(--tenue); }
+  li small { color: var(--tenue); font-size: 12px; display: block; font-weight: normal; }
+  .fuera { font-family: "Arial Black", Arial; font-size: 26px; margin: 4px 0 6px; }
+  .cuenta { font-family: "Arial Black", Arial; font-size: 48px; color: var(--acento); text-align: center; margin: 6px 0 0; }
 </style>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" integrity="sha384-nlUQ8ZqCbvStErob+biJNzSgltf6urV3VGqhfIfzhmg9RXmpeRm76ELw0pYnKlTR" crossorigin="anonymous"></script>
 </head>
@@ -48,6 +64,7 @@
     <div class="tarjeta">
       <h1>No pica, <span>zumba</span></h1>
       <p>Son mosquitos machos: no pican, viven del ruido. Zumbale en la oreja al que duerme y sumá. Si se fastidia, tira cachetazos. Si prende el velador, rajá a la oscuridad.</p>
+      <p class="reglas">Cada ronda es una carrera a 250. El último queda afuera. Los dos que quedan juegan la final en el patio.</p>
       <label for="nombre">Tu nombre</label>
       <input id="nombre" maxlength="14" placeholder="Oliver" autocomplete="off">
       <div class="fila">
@@ -60,7 +77,45 @@
         <button id="entrar">Entrar</button>
       </div>
       <p class="error" id="error"></p>
+      <div class="perfil" id="resumenPerfil"></div>
       <div class="teclas"><kbd>←↑↓→</kbd> o <kbd>WASD</kbd> volar · <kbd>Espacio</kbd> zumbido fuerte (suma el doble, pero lo despierta más rápido y te hace lento)</div>
+    </div>
+  </section>
+
+  <section class="capa" id="unirse" hidden>
+    <div class="tarjeta">
+      <h1>No pica, <span>zumba</span></h1>
+      <p>Te invitaron a la sala <b id="codigoUnirse" style="color:var(--acento)"></b>. Poné tu nombre y entrá.</p>
+      <label for="nombreUnirse">Tu nombre</label>
+      <input id="nombreUnirse" maxlength="14" placeholder="Oliver" autocomplete="off">
+      <div class="fila"><button class="principal" id="entrarLink">Entrar a la sala</button></div>
+      <p class="error" id="errorUnirse"></p>
+      <button class="enlace" id="noUnirse">No, quiero crear mi propia sala</button>
+      <div class="teclas"><kbd>←↑↓→</kbd> o <kbd>WASD</kbd> volar · <kbd>Espacio</kbd> zumbido fuerte</div>
+    </div>
+  </section>
+
+  <section class="capa" id="entre" hidden>
+    <div class="tarjeta">
+      <h2 id="entreTitulo"></h2>
+      <p class="fuera" id="entreFuera"></p>
+      <p id="entreFrase"></p>
+      <ul id="entreLista"></ul>
+      <p id="entreSigue" style="margin:0"></p>
+      <div class="cuenta" id="entreCuenta"></div>
+    </div>
+  </section>
+
+  <section class="capa" id="perfil" hidden>
+    <div class="tarjeta ancha">
+      <h2>Tu historial</h2>
+      <p style="font-size:13px">Se guarda en este navegador. Cada amigo tiene el suyo en su compu.</p>
+      <div class="stats" id="stats"></div>
+      <ul id="historial"></ul>
+      <div class="fila">
+        <button class="principal" id="volverPerfil">Volver</button>
+        <button id="borrarPerfil">Borrar historial</button>
+      </div>
     </div>
   </section>
 
@@ -79,7 +134,9 @@
         <button id="bot">Agregar bot</button>
         <button class="principal" id="empezar">Empezar</button>
       </div>
+      <p class="reglas" id="faltaGente" hidden>Para empezar falta al menos un amigo o un bot.</p>
       <p id="esperando" hidden>Esperando que el anfitrión arranque la partida…</p>
+      <button class="enlace" id="salirSala">Salir de la sala</button>
     </div>
   </section>
 
@@ -87,14 +144,17 @@
     <div class="tarjeta">
       <h2 id="ganador"></h2>
       <ul id="podio"></ul>
+      <p id="finTuyo"></p>
       <div class="fila" id="accionesFin">
         <button class="principal" id="revancha">Revancha</button>
       </div>
       <p id="esperandoFin" hidden>El anfitrión decide si hay revancha.</p>
+      <button class="enlace" id="salirFin">Salir al inicio</button>
     </div>
   </section>
 
   <button id="mute" title="Sonido">🔊</button>
+  <button id="salirJuego" hidden>✕ Salir</button>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>
